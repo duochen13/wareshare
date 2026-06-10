@@ -42,7 +42,11 @@
       "Bash(brew install *)",
       "Bash(brew --version)",
       "Bash(cmake --version)",
-      "Bash(ninja --version)"
+      "Bash(ninja --version)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"gh auth login\")",
+      "Bash(gh api *)",
+      "Bash(gh repo *)"
     ]
   }
 }
