@@ -1,0 +1,23 @@
+# ESP-IDF build artifacts
+firmware/**/build/
+firmware/**/sdkconfig
+firmware/**/sdkconfig.old
+firmware/**/managed_components/
+firmware/**/dependencies.lock
+
+# Python
+server/.venv/
+server/__pycache__/
+server/**/__pycache__/
+.env
+
+# Reference clone — not part of our build
+xiaozhi-esp32/
+
+# Unrelated workspace content
+data/
+reports/
+.gstack/
+
+# macOS
+.DS_Store
