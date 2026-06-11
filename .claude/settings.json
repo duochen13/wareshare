@@ -48,7 +48,12 @@
       "Bash(gh api *)",
       "Bash(gh repo *)",
       "Read(//dev/**)",
-      "Bash(ioreg -p IOUSB -l -w 0)"
+      "Bash(ioreg -p IOUSB -l -w 0)",
+      "Read(//private/tmp/claude/**)"
+    ],
+    "additionalDirectories": [
+      "/tmp/claude",
+      "/private/tmp/claude"
     ]
   }
 }

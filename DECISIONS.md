@@ -13,7 +13,22 @@
 ## Environment (Milestone 0)
 - **ESP-IDF:** `~/esp/esp-idf` @ `release/v5.5` (`1576525dac`), tools installed (`idf5.5_py3.14_env`). `get_idf` alias added to `~/.zshrc`.
 - **Host tools:** Homebrew cmake + ninja present.
-- **Board serial port:** `/dev/cu.usbmodem101` (native USB; appeared on plug-in — no driver needed).
+- **Board serial port:** `/dev/cu.usbmodem101` (native USB; appeared on plug-in — no driver needed). Note: the port can disappear if the board is unplugged/reset; re-check with `ls /dev/cu.*`.
+- **Flash size:** board reports **16 MB** flash (chip rev v0.2, 2 CPU cores). Set `CONFIG_ESPTOOLPY_FLASHSIZE_16MB` in our own firmware.
+
+## ✅ Task 5 gate PASSED (2026-06-10)
+- `firmware/hello_world` flashed over `/dev/cu.usbmodem101` and the serial log printed `Hello world!` + the chip banner + the restart countdown. Toolchain → USB → flashing → execution all confirmed working on IDF v5.5.
+
+## ✅ Task 7 gate PASSED → MILESTONE 0 COMPLETE (2026-06-10)
+- Built XiaoZhi from source for `CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_AUDIO_BOARD` (the verified reference for this board), flashed it, and confirmed in the boot log:
+  - `Board: SKU=esp32-s3-audio-board` (correct board auto-detected)
+  - `ES8311: Work in Slave mode` (DAC up), `ES7210: Work in Slave mode` + `Enable MIC1..MIC4` + `Enable TDM mode` (4-ch ADC up)
+  - `BoxAudioCodec: BoxAudioDevice initialized` → `Adev_Codec: Open codec device OK`. **No I2C errors on the codec bus, no panic.**
+- **Pin map from `docs/.../reference/xiaozhi-board-reference.md` is now hardware-confirmed.**
+- ⚠️ **Camera is NOT populated on our board** — the boot log's only I2C errors are `ov2640`/`ov5640` sensor-ID failures (the camera configs we copied from XiaoZhi's `config.json`). **Our own firmware must NOT enable the camera** (`CONFIG_CAMERA_*`); it's irrelevant to the audio assistant and just spams errors.
+- XiaoZhi build config lives in `xiaozhi-esp32/sdkconfig.defaults` (gitignored reference clone; original saved as `sdkconfig.defaults.bak`).
+
+> Milestone 0 done: toolchain installed (v5.5), `hello_world` flashed, audio reference boots with ES8311 + ES7210 initializing cleanly, ESP-SR/IDF compat confirmed, board audio pin map recorded **and verified on hardware**. Next: write the Milestone 1a (playback) plan using the confirmed recipe.
 
 ## Resolved: firmware base (was "Task 6 research")
 - **Pin map confirmed** from XiaoZhi `config.h` — see `docs/superpowers/reference/xiaozhi-board-reference.md`.
