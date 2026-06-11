@@ -22,5 +22,6 @@
 - **⚠️ Speaker amp enabled via TCA9555 IO-expander pin EXIO8** (not a GPIO). Must drive it high or
   there is no sound.
 
-## Open (resolve before Milestone 2)
-- [ ] ESP-SR version and its required ESP-IDF version (affects which ESP-IDF we pin).
+## Resolved: ESP-SR ↔ ESP-IDF compatibility (was Task 6 Step 4)
+- Resolved the `espressif/esp-sr` manifest via the component registry: **every published version 2.3.1 → 2.4.6 (latest) requires only `idf >= 5.0`.**
+- ⇒ Our installed **ESP-IDF v5.5 is fully compatible with ESP-SR**. No re-pin of the toolchain needed for Milestone 2 (wake word).
