@@ -125,8 +125,8 @@ static esp_err_t init_es8311_output(void)
         .mclk_multiple = 0,
     };
     ESP_RETURN_ON_ERROR(esp_codec_dev_open(s_out_dev, &fs), TAG, "codec open");
-    ESP_RETURN_ON_ERROR(esp_codec_dev_set_out_vol(s_out_dev, 80), TAG, "set vol");
-    ESP_LOGI(TAG, "ES8311 output codec opened (24kHz/16bit/mono, vol 80)");
+    ESP_RETURN_ON_ERROR(esp_codec_dev_set_out_vol(s_out_dev, 60), TAG, "set vol");
+    ESP_LOGI(TAG, "ES8311 output codec opened (24kHz/16bit/mono, vol 60)");
     return ESP_OK;
 }
 

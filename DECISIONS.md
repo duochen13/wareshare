@@ -30,6 +30,13 @@
 
 > Milestone 0 done: toolchain installed (v5.5), `hello_world` flashed, audio reference boots with ES8311 + ES7210 initializing cleanly, ESP-SR/IDF compat confirmed, board audio pin map recorded **and verified on hardware**. Next: write the Milestone 1a (playback) plan using the confirmed recipe.
 
+## ✅ Milestone 1a (playback) COMPLETE (2026-06-12)
+- Our **own** firmware `firmware/voice-assistant/` plays a steady 440 Hz sine through ES8311 → NS4150B at 24 kHz — **tone confirmed audible by the user.**
+- Bring-up is in `main/board_audio.c`: I²C master (sda=11/scl=10) → TCA9555 EXIO8 high (amp) → I²S TX std (mclk=12/bclk=13/ws=14/dout=16, 24 kHz, MCLK×256, 16-bit stereo) → ES8311 DAC via `esp_codec_dev` (pinned `esp_codec_dev` 1.5.10, `esp_io_expander_tca95xx_16bit` 2.0.2). `main.c` generates the sine and streams it with `esp_codec_dev_write`. **Tuned for comfortable volume: codec volume 60, amplitude 3000 (~-20 dBFS)** — initial 80/8000 was too loud on this board.
+- Build/flash gotcha learned: **only one process can hold `/dev/cu.usbmodem101`** — close `idf.py monitor` before flashing or you get "No serial data received" / port-busy. Also added `esp_driver_gpio` to the component REQUIRES (board_config.h needs `driver/gpio.h`).
+
+> Next: **Milestone 1b (capture)** — add the ES7210 RX path (duplex I²S, TDM 4-slot), record mic to a buffer, dump to the Mac, confirm intelligible. See plan §"What this sets up for Milestone 1b".
+
 ## Resolved: firmware base (was "Task 6 research")
 - **Pin map confirmed** from XiaoZhi `config.h` — see `docs/superpowers/reference/xiaozhi-board-reference.md`.
 - **Audio:** ES8311 (DAC, I2S std TX) + ES7210 (4-ch ADC, I2S TDM RX), duplex on `I2S_NUM_0`,
