@@ -49,7 +49,8 @@
       "Bash(gh repo *)",
       "Read(//dev/**)",
       "Bash(ioreg -p IOUSB -l -w 0)",
-      "Read(//private/tmp/claude/**)"
+      "Read(//private/tmp/claude/**)",
+      "Bash(awk '/esp_codec_dev_read\\\\\\(/{f=1} f{print NR\": \"$0} f&&/^}/{exit}' esp_codec_dev.c)"
     ],
     "additionalDirectories": [
       "/tmp/claude",

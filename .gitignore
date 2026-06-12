@@ -19,5 +19,8 @@ data/
 reports/
 .gstack/
 
+# Captured audio test artifacts (may contain voice)
+*.wav
+
 # macOS
 .DS_Store
