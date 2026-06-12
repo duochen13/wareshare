@@ -18,3 +18,7 @@
 #define BOARD_AMP_EXIO_PIN    IO_EXPANDER_PIN_NUM_8
 
 #define BOARD_AUDIO_SAMPLE_RATE   24000
+
+/* ES7210 is a 4-channel ADC; we keep channel 0. */
+#define BOARD_MIC_CHANNELS    4
+#define BOARD_MIC_GAIN_DB     30.0f

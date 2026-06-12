@@ -5,15 +5,19 @@
 #include "esp_check.h"
 #include "driver/i2c_master.h"
 #include "driver/i2s_std.h"
+#include "driver/i2s_tdm.h"
 #include "esp_io_expander_tca95xx_16bit.h"
 #include "esp_codec_dev_defaults.h"
 
 static const char *TAG = "board_audio";
 
-static i2c_master_bus_handle_t s_i2c_bus;
+static i2c_master_bus_handle_t  s_i2c_bus;
 static esp_io_expander_handle_t s_io_expander;
-static i2s_chan_handle_t s_tx_chan;
-static esp_codec_dev_handle_t  s_out_dev;
+static i2s_chan_handle_t        s_tx_chan;
+static i2s_chan_handle_t        s_rx_chan;
+static const audio_codec_data_if_t *s_data_if;   /* shared by in + out */
+static esp_codec_dev_handle_t   s_out_dev;
+static esp_codec_dev_handle_t   s_in_dev;
 
 static esp_err_t init_i2c(void)
 {
@@ -44,7 +48,7 @@ static esp_err_t init_amp(void)
     return ESP_OK;
 }
 
-static esp_err_t init_i2s_tx(void)
+static esp_err_t init_i2s_duplex(void)
 {
     i2s_chan_config_t chan_cfg = {
         .id = I2S_NUM_0,
@@ -53,9 +57,9 @@ static esp_err_t init_i2s_tx(void)
         .dma_frame_num = 240,
         .auto_clear_after_cb = true,
     };
-    /* TX only for playback; no RX handle in milestone 1a */
-    ESP_RETURN_ON_ERROR(i2s_new_channel(&chan_cfg, &s_tx_chan, NULL), TAG, "i2s new chan");
+    ESP_RETURN_ON_ERROR(i2s_new_channel(&chan_cfg, &s_tx_chan, &s_rx_chan), TAG, "i2s new chan");
 
+    /* TX (to ES8311 / speaker): standard Philips, stereo 16-bit */
     i2s_std_config_t std_cfg = {
         .clk_cfg = {
             .sample_rate_hz = BOARD_AUDIO_SAMPLE_RATE,
@@ -73,27 +77,64 @@ static esp_err_t init_i2s_tx(void)
         },
     };
     ESP_RETURN_ON_ERROR(i2s_channel_init_std_mode(s_tx_chan, &std_cfg), TAG, "i2s init std");
-    ESP_RETURN_ON_ERROR(i2s_channel_enable(s_tx_chan), TAG, "i2s enable");
+
+    /* RX (from ES7210 / mics): TDM 4-slot 16-bit (ES7210 is a 4-channel ADC) */
+    i2s_tdm_config_t tdm_cfg = {
+        .clk_cfg = {
+            .sample_rate_hz = BOARD_AUDIO_SAMPLE_RATE,
+            .clk_src = I2S_CLK_SRC_DEFAULT,
+            .mclk_multiple = I2S_MCLK_MULTIPLE_256,
+            .bclk_div = 8,
+        },
+        .slot_cfg = {
+            .data_bit_width = I2S_DATA_BIT_WIDTH_16BIT,
+            .slot_bit_width = I2S_SLOT_BIT_WIDTH_AUTO,
+            .slot_mode = I2S_SLOT_MODE_STEREO,
+            .slot_mask = I2S_TDM_SLOT0 | I2S_TDM_SLOT1 | I2S_TDM_SLOT2 | I2S_TDM_SLOT3,
+            .ws_width = I2S_TDM_AUTO_WS_WIDTH,
+            .ws_pol = false,
+            .bit_shift = true,
+            .left_align = false,
+            .big_endian = false,
+            .bit_order_lsb = false,
+            .skip_mask = false,
+            .total_slot = I2S_TDM_AUTO_SLOT_NUM,
+        },
+        .gpio_cfg = {
+            .mclk = BOARD_I2S_MCLK_GPIO,
+            .bclk = BOARD_I2S_BCLK_GPIO,
+            .ws   = BOARD_I2S_WS_GPIO,
+            .dout = I2S_GPIO_UNUSED,
+            .din  = BOARD_I2S_DIN_GPIO,
+        },
+    };
+    ESP_RETURN_ON_ERROR(i2s_channel_init_tdm_mode(s_rx_chan, &tdm_cfg), TAG, "i2s init tdm");
+
+    ESP_RETURN_ON_ERROR(i2s_channel_enable(s_tx_chan), TAG, "i2s tx enable");
+    ESP_RETURN_ON_ERROR(i2s_channel_enable(s_rx_chan), TAG, "i2s rx enable");
     return ESP_OK;
 }
 
-static esp_err_t init_es8311_output(void)
+static esp_err_t init_data_if(void)
 {
     const audio_codec_i2s_cfg_t i2s_cfg = {
         .port = I2S_NUM_0,
         .tx_handle = s_tx_chan,
-        .rx_handle = NULL,
+        .rx_handle = s_rx_chan,
     };
-    const audio_codec_data_if_t *data_if = audio_codec_new_i2s_data(&i2s_cfg);
-    ESP_RETURN_ON_FALSE(data_if, ESP_FAIL, TAG, "i2s data if");
+    s_data_if = audio_codec_new_i2s_data(&i2s_cfg);
+    return s_data_if ? ESP_OK : ESP_FAIL;
+}
 
+static esp_err_t init_es8311_output(void)
+{
     const audio_codec_i2c_cfg_t i2c_cfg = {
         .port = BOARD_I2C_PORT,
         .addr = ES8311_CODEC_DEFAULT_ADDR,
         .bus_handle = s_i2c_bus,
     };
     const audio_codec_ctrl_if_t *ctrl_if = audio_codec_new_i2c_ctrl(&i2c_cfg);
-    ESP_RETURN_ON_FALSE(ctrl_if, ESP_FAIL, TAG, "i2c ctrl if");
+    ESP_RETURN_ON_FALSE(ctrl_if, ESP_FAIL, TAG, "es8311 i2c ctrl");
 
     const audio_codec_gpio_if_t *gpio_if = audio_codec_new_gpio();
     ESP_RETURN_ON_FALSE(gpio_if, ESP_FAIL, TAG, "gpio if");
@@ -112,10 +153,10 @@ static esp_err_t init_es8311_output(void)
     esp_codec_dev_cfg_t dev_cfg = {
         .dev_type = ESP_CODEC_DEV_TYPE_OUT,
         .codec_if = codec_if,
-        .data_if = data_if,
+        .data_if = s_data_if,
     };
     s_out_dev = esp_codec_dev_new(&dev_cfg);
-    ESP_RETURN_ON_FALSE(s_out_dev, ESP_FAIL, TAG, "codec dev new");
+    ESP_RETURN_ON_FALSE(s_out_dev, ESP_FAIL, TAG, "out dev new");
 
     esp_codec_dev_sample_info_t fs = {
         .bits_per_sample = 16,
@@ -124,9 +165,50 @@ static esp_err_t init_es8311_output(void)
         .sample_rate = BOARD_AUDIO_SAMPLE_RATE,
         .mclk_multiple = 0,
     };
-    ESP_RETURN_ON_ERROR(esp_codec_dev_open(s_out_dev, &fs), TAG, "codec open");
-    ESP_RETURN_ON_ERROR(esp_codec_dev_set_out_vol(s_out_dev, 60), TAG, "set vol");
-    ESP_LOGI(TAG, "ES8311 output codec opened (24kHz/16bit/mono, vol 60)");
+    ESP_RETURN_ON_ERROR(esp_codec_dev_open(s_out_dev, &fs), TAG, "out open");
+    ESP_RETURN_ON_ERROR(esp_codec_dev_set_out_vol(s_out_dev, 60), TAG, "out vol");
+    ESP_LOGI(TAG, "ES8311 output codec opened");
+    return ESP_OK;
+}
+
+static esp_err_t init_es7210_input(void)
+{
+    const audio_codec_i2c_cfg_t i2c_cfg = {
+        .port = BOARD_I2C_PORT,
+        .addr = ES7210_CODEC_DEFAULT_ADDR,
+        .bus_handle = s_i2c_bus,
+    };
+    const audio_codec_ctrl_if_t *ctrl_if = audio_codec_new_i2c_ctrl(&i2c_cfg);
+    ESP_RETURN_ON_FALSE(ctrl_if, ESP_FAIL, TAG, "es7210 i2c ctrl");
+
+    es7210_codec_cfg_t es7210_cfg = {
+        .ctrl_if = ctrl_if,
+        .mic_selected = ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3 | ES7210_SEL_MIC4,
+    };
+    const audio_codec_if_t *codec_if = es7210_codec_new(&es7210_cfg);
+    ESP_RETURN_ON_FALSE(codec_if, ESP_FAIL, TAG, "es7210 new");
+
+    esp_codec_dev_cfg_t dev_cfg = {
+        .dev_type = ESP_CODEC_DEV_TYPE_IN,
+        .codec_if = codec_if,
+        .data_if = s_data_if,
+    };
+    s_in_dev = esp_codec_dev_new(&dev_cfg);
+    ESP_RETURN_ON_FALSE(s_in_dev, ESP_FAIL, TAG, "in dev new");
+
+    esp_codec_dev_sample_info_t fs = {
+        .bits_per_sample = 16,
+        .channel = BOARD_MIC_CHANNELS,
+        .channel_mask = ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0),
+        .sample_rate = BOARD_AUDIO_SAMPLE_RATE,
+        .mclk_multiple = 0,
+    };
+    ESP_RETURN_ON_ERROR(esp_codec_dev_open(s_in_dev, &fs), TAG, "in open");
+    ESP_RETURN_ON_ERROR(
+        esp_codec_dev_set_in_channel_gain(s_in_dev, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), BOARD_MIC_GAIN_DB),
+        TAG, "in gain");
+    ESP_LOGI(TAG, "ES7210 input codec opened (24kHz/16bit/%d-ch, +%.0fdB ch0)",
+             BOARD_MIC_CHANNELS, BOARD_MIC_GAIN_DB);
     return ESP_OK;
 }
 
@@ -134,12 +216,29 @@ esp_err_t board_audio_init(void)
 {
     ESP_RETURN_ON_ERROR(init_i2c(), TAG, "i2c");
     ESP_RETURN_ON_ERROR(init_amp(), TAG, "amp");
-    ESP_RETURN_ON_ERROR(init_i2s_tx(), TAG, "i2s");
+    ESP_RETURN_ON_ERROR(init_i2s_duplex(), TAG, "i2s");
+    ESP_RETURN_ON_ERROR(init_data_if(), TAG, "data_if");
     ESP_RETURN_ON_ERROR(init_es8311_output(), TAG, "es8311");
+    ESP_RETURN_ON_ERROR(init_es7210_input(), TAG, "es7210");
     return ESP_OK;
 }
 
-esp_codec_dev_handle_t board_audio_get_output_dev(void)
+esp_codec_dev_handle_t board_audio_get_output_dev(void) { return s_out_dev; }
+esp_codec_dev_handle_t board_audio_get_input_dev(void)  { return s_in_dev; }
+
+esp_err_t board_audio_read_mono(int16_t *dst, size_t frames)
 {
-    return s_out_dev;
+    int16_t tmp[240 * BOARD_MIC_CHANNELS];
+    size_t done = 0;
+    while (done < frames) {
+        size_t n = frames - done;
+        if (n > 240) n = 240;
+        esp_err_t err = esp_codec_dev_read(s_in_dev, tmp, n * BOARD_MIC_CHANNELS * sizeof(int16_t));
+        if (err != ESP_OK) return err;
+        for (size_t i = 0; i < n; i++) {
+            dst[done + i] = tmp[i * BOARD_MIC_CHANNELS];   /* channel 0 */
+        }
+        done += n;
+    }
+    return ESP_OK;
 }
