@@ -35,7 +35,15 @@
 - Bring-up is in `main/board_audio.c`: I²C master (sda=11/scl=10) → TCA9555 EXIO8 high (amp) → I²S TX std (mclk=12/bclk=13/ws=14/dout=16, 24 kHz, MCLK×256, 16-bit stereo) → ES8311 DAC via `esp_codec_dev` (pinned `esp_codec_dev` 1.5.10, `esp_io_expander_tca95xx_16bit` 2.0.2). `main.c` generates the sine and streams it with `esp_codec_dev_write`. **Tuned for comfortable volume: codec volume 60, amplitude 3000 (~-20 dBFS)** — initial 80/8000 was too loud on this board.
 - Build/flash gotcha learned: **only one process can hold `/dev/cu.usbmodem101`** — close `idf.py monitor` before flashing or you get "No serial data received" / port-busy. Also added `esp_driver_gpio` to the component REQUIRES (board_config.h needs `driver/gpio.h`).
 
-> Next: **Milestone 1b (capture)** — add the ES7210 RX path (duplex I²S, TDM 4-slot), record mic to a buffer, dump to the Mac, confirm intelligible. See plan §"What this sets up for Milestone 1b".
+## ✅ Milestone 1b (mic capture) COMPLETE (2026-06-14)
+- `firmware/voice-assistant/` now records the ES7210 mic (duplex I²S, RX = TDM 4-slot) and `tools/capture_mic.py` saves it to `mic.wav` on the Mac — **playback confirmed intelligible by the user** at `BOARD_MIC_GAIN_DB = 12`.
+- `board_audio.c`: duplex `i2s_new_channel` (TX std + RX TDM 4-slot), one shared `audio_codec_new_i2s_data`, ES8311 out + ES7210 in (MIC1-4), `board_audio_read_mono()` reads 4-ch interleaved and keeps channel 0.
+- **Two bugs fixed during bring-up (both important for later milestones):**
+  1. **Don't record and print at the same time** — record the whole clip into a RAM buffer in one continuous `board_audio_read_mono()` call, *then* dump. (144 KB fits in internal RAM; no PSRAM needed yet.)
+  2. **The USB-serial console DROPS TX bytes if the host can't keep up.** Fast base64 dumps corrupted ~1 chunk/0.9 s → full-scale glitch bursts. Fix: `fflush(stdout) + vTaskDelay(2 ms)` per line. *Verified the captured buffer was glitch-free (peak 39) while the un-paced transfer showed peak 30444 — the corruption was 100% in transfer, not capture.*
+  - Gain note: the earlier "distortion" was these transfer glitches, NOT analog clipping — gain (30→15→0→12) was a red herring. 12 dB is a good level with lots of headroom.
+
+> Next: **Milestone 2 (wake word)** — feed the mic stream into ESP-SR (AFE: NR+VAD) + WakeNet, light an LED on detect. Pick a built-in wake word ("Hi ESP"/"Alexa"/"Jarvis"/…). Steepest milestone. Write the plan first.
 
 ## Resolved: firmware base (was "Task 6 research")
 - **Pin map confirmed** from XiaoZhi `config.h` — see `docs/superpowers/reference/xiaozhi-board-reference.md`.

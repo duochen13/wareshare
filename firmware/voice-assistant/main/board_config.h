@@ -21,4 +21,4 @@
 
 /* ES7210 is a 4-channel ADC; we keep channel 0. */
 #define BOARD_MIC_CHANNELS    4
-#define BOARD_MIC_GAIN_DB     0.0f
+#define BOARD_MIC_GAIN_DB     12.0f
