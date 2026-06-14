@@ -1,5 +1,6 @@
 idf_component_register(
-    SRCS "main.c" "board_audio.c"
+    SRCS "main.c" "board_audio.c" "wakenet.c" "led.c"
     INCLUDE_DIRS "."
-    REQUIRES esp_driver_gpio esp_driver_i2c esp_driver_i2s esp_codec_dev esp_io_expander_tca95xx_16bit mbedtls
+    REQUIRES esp_driver_gpio esp_driver_i2c esp_driver_i2s esp_codec_dev
+             esp_io_expander_tca95xx_16bit mbedtls esp-sr led_strip esp_timer
 )

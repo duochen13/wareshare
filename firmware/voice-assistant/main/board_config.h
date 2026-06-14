@@ -17,8 +17,12 @@
 /* Speaker amplifier enable is NOT a GPIO: it is EXIO8 on the TCA9555 expander */
 #define BOARD_AMP_EXIO_PIN    IO_EXPANDER_PIN_NUM_8
 
-#define BOARD_AUDIO_SAMPLE_RATE   24000
+#define BOARD_AUDIO_SAMPLE_RATE   16000   /* WakeNet/AFE require 16 kHz */
 
 /* ES7210 is a 4-channel ADC; we keep channel 0. */
 #define BOARD_MIC_CHANNELS    4
 #define BOARD_MIC_GAIN_DB     12.0f
+
+/* On-board WS2812 RGB strip */
+#define BOARD_LED_GPIO        38
+#define BOARD_LED_COUNT       6

@@ -207,8 +207,8 @@ static esp_err_t init_es7210_input(void)
     ESP_RETURN_ON_ERROR(
         esp_codec_dev_set_in_channel_gain(s_in_dev, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), BOARD_MIC_GAIN_DB),
         TAG, "in gain");
-    ESP_LOGI(TAG, "ES7210 input codec opened (24kHz/16bit/%d-ch, +%.0fdB ch0)",
-             BOARD_MIC_CHANNELS, BOARD_MIC_GAIN_DB);
+    ESP_LOGI(TAG, "ES7210 input codec opened (%dHz/16bit/%d-ch, +%.0fdB ch0)",
+             BOARD_AUDIO_SAMPLE_RATE, BOARD_MIC_CHANNELS, BOARD_MIC_GAIN_DB);
     return ESP_OK;
 }
 

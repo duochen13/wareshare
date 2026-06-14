@@ -118,6 +118,7 @@ idf_component_register(
 `firmware/voice-assistant/main/wakenet.h`:
 ```c
 #pragma once
+#include <stdbool.h>
 
 /* Called (from the detect task) each time the wake word fires. Keep it quick. */
 typedef void (*wakenet_detected_cb_t)(void);
